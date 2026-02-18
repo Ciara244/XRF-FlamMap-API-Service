@@ -10,24 +10,27 @@ xrf-flammap-service/
 │
 ├── 📂 app/
 │   ├── __init__.py             (Archivo vacío)
-│   ├── main.py                 (El Servidor API - El "Camarero")
-│   └── flammap_runner.py       (El Robot - El "Cocinero")
+│   ├── main.py                 (Servidor API - El "Camarero")
+│   ├── flammap_runner.py       (Robot de Automatización - El "Cocinero")
+│   ├── config_writer.py        (Generador de archivos .WND y .FMS dinámicos)
+│   └── fmp_manager.py          (Gestor de proyectos y compatibilidad V19)
 │
 ├── 📂 data/
-│   ├── 📂 inputs/              (Aquí guardas tus .LCP y .FMS de prueba)
-│   ├── 📂 output_files/        (Aquí se guardarán los resultados)
+│   ├── 📂 inputs/              (Plantillas maestras: .fmp, .fzp, .lcp, .tif)
+│   ├── 📂 output_files/        (Almacén final de resultados .TIF)
+│   └── 📂 temp_sessions/       (Sesiones aisladas por UUID para multi-usuario)
 │
-├── ProyectoXRF_Ronda1.fmp      (¡IMPORTANTE! Tu archivo de proyecto maestro)
 ├── requirements.txt            (fastapi, uvicorn, pyautogui, python-multipart)
-└── README.md                   (Explicación de cómo usarlo)
+└── README.md                   (Instrucciones de uso y despliegue)
 
 ## Descripcion de Componentes
 * app/main.py: Gestiona los puntos de entrada (endpoints) de la API y recibe las peticiones externas.
 * app/flammap_runner.py: Contiene la logica de automatizacion con PyAutoGUI para controlar la interfaz de FlamMap.
+* app/fmp_manager.py: Encargado de clonar la plantilla maestra y generar los archivos .fmp y .fzp necesarios para que el motor GIS de FlamMap no falle al mover el proyecto de carpeta.
+* app/config_writer.py: Escribe dinámicamente las tablas de humedad (.fms) y viento (.wnd) basadas en los porcentajes y valores recibidos por la API.
+* data/temp_sessions: Carpeta crítica donde se crean subdirectorios únicos por cada petición (ej. 0fd5f684) para evitar colisiones de archivos entre usuarios.
 * data/inputs: Directorio destinado a almacenar el paisaje (Landscape) y las tablas de humedad necesarias.
 * data/outputs: Directorio destinado a guardar los resultados generados.
-* ProyectoXRF_Ronda1.fmp: Archivo principal que contiene la configuracion fisica y el modelo Scott/Reinhardt (2001). Prueba
-
 
 ## Instalacion y Configuracion
 1. Requisitos del Sistema:

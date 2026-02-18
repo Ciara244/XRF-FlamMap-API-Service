@@ -11,9 +11,14 @@ def ejecutar_simulacion_robot(exe_path, project_path, output_path):
     Robot completo: Navega, lanza 22-tabs, pulsa OK, expande árbol y selecciona mapa Flame Length.
     """
     try:
-        # 1. Limpieza previa del archivo de salida para evitar confusiones
+        # 1. MEJORA DE LIMPIEZA: Asegurar que borramos el output viejo
         if os.path.exists(output_path):
-            os.remove(output_path)
+            try:
+                os.remove(output_path)
+                logger.info(f"Archivo antiguo eliminado: {output_path}")
+            except PermissionError:
+                logger.error("No se pudo borrar el archivo anterior. ¿Está abierto en otro programa?")
+                return False
 
         # 2. Abrir FlamMap con el proyecto que le hemos pasado
         logger.info(f"Abriendo: {project_path}")
