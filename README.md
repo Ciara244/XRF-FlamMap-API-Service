@@ -1,76 +1,285 @@
-# XRF FlamMap API Service
+# XRF FlamMap API Service (Headless Edition)
 
-Este proyecto consiste en un Wrapper API desarrollado en Python para la automatizacion y modernizacion del simulador de incendios forestales FlamMap6. El sistema permite la ejecucion de simulaciones mediante peticiones HTTP, actuando como un puente entre clientes modernos y el software legacy.
+Este proyecto consiste en una **API REST profesional desarrollada en Python** para la orquestación y ejecución automatizada del motor de simulación de incendios **FlamMap**.
 
+A diferencia de versiones anteriores basadas en automatización de interfaz (GUI), esta **versión 2.0 implementa una arquitectura Headless (sin interfaz)**.
 
-## Estructura del Proyecto
-La organizacion del repositorio sigue los estandares de desarrollo modular para separar la logica del servidor de los datos de simulacion:
+El sistema interactúa directamente con los ejecutables de consola del Missoula Fire Sciences Lab, permitiendo:
 
-xrf-flammap-service/
+- Simulaciones en segundo plano
+- Gestión de colas
+- Aislamiento de sesiones
+- Rendimiento superior sin bloquear el escritorio del usuario
+
+---
+
+## 🚀 Características Principales
+
+### Arquitectura Backend Real
+
+Ejecución mediante `subprocess` y tuberías de sistema, eliminando la necesidad de simular clics de ratón.
+
+### Multiusuario y Aislado
+
+Sistema de sesiones basado en **UUID** que permite múltiples simulaciones simultáneas sin colisiones de archivos.
+
+### Salida de Datos Raw
+
+Generación y retorno de mapas **GeoTIFF (.tif)** listos para análisis en sistemas GIS:
+
+- QGIS
+- ArcGIS
+
+### Input Dinámico
+
+Generación automática de archivos de configuración:
+
+- `.input`
+- `.wnd`
+- `.fms`
+
+Basada en los parámetros recibidos vía HTTP.
+
+---
+
+## 📂 Estructura del Proyecto
+
+```
+FLAMMAPSERVICEXRF/
 │
-├── 📂 app/
-│   ├── __init__.py             (Archivo vacío)
-│   ├── main.py                 (Servidor API - El "Camarero")
-│   ├── flammap_runner.py       (Robot de Automatización - El "Cocinero")
-│   ├── config_writer.py        (Generador de archivos .WND y .FMS dinámicos)
-│   └── fmp_manager.py          (Gestor de proyectos y compatibilidad V19)
+├── app/
+│   ├── __init__.py
+│   ├── main.py              # Servidor API FastAPI (Orquestador)
+│   ├── flammap_runner.py   # Motor de ejecución FlamMap
+│   ├── config_writer.py    # Generador de archivos .input y comandos
+│   └── fmp_manager.py      # Gestión de sesiones y directorios
 │
-├── 📂 data/
-│   ├── 📂 inputs/              (Plantillas maestras: .fmp, .fzp, .lcp, .tif)
-│   ├── 📂 output_files/        (Almacén final de resultados .TIF)
-│   └── 📂 temp_sessions/       (Sesiones aisladas por UUID para multi-usuario)
+├── data/
+│   ├── inputs/             # Plantillas base y archivos de prueba
+│   ├── outputs/            # Resultados persistentes (opcional)
+│   └── temp_sessions/      # Entornos aislados por UUID
 │
-├── requirements.txt            (fastapi, uvicorn, pyautogui, python-multipart)
-└── README.md                   (Instrucciones de uso y despliegue)
+├── pruebas/                # Scripts de prueba
+│
+├── requirements           # Dependencias Python
+└── README.md              # Documentación
+```
 
-## Descripcion de Componentes
-* app/main.py: Gestiona los puntos de entrada (endpoints) de la API y recibe las peticiones externas.
-* app/flammap_runner.py: Contiene la logica de automatizacion con PyAutoGUI para controlar la interfaz de FlamMap.
-* app/fmp_manager.py: Encargado de clonar la plantilla maestra y generar los archivos .fmp y .fzp necesarios para que el motor GIS de FlamMap no falle al mover el proyecto de carpeta.
-* app/config_writer.py: Escribe dinámicamente las tablas de humedad (.fms) y viento (.wnd) basadas en los porcentajes y valores recibidos por la API.
-* data/temp_sessions: Carpeta crítica donde se crean subdirectorios únicos por cada petición (ej. 0fd5f684) para evitar colisiones de archivos entre usuarios.
-* data/inputs: Directorio destinado a almacenar el paisaje (Landscape) y las tablas de humedad necesarias.
-* data/outputs: Directorio destinado a guardar los resultados generados.
+---
 
-## Instalacion y Configuracion
-1. Requisitos del Sistema:
-* Python 3.10 o superior.
-* FlamMap 6 instalado en el equipo.
+## 🛠️ Descripción de Componentes
 
-2. Instalacion de Librerias:
-Ejecute el siguiente comando para instalar las dependencias necesarias:
-pip install -r requirements.txt
+### app/main.py
 
-3. Ejecucion del Servicio:
-Para iniciar el servidor en modo desarrollo, ejecute:
-uvicorn app.main:app --reload
+El corazón de la API.
 
+Responsabilidades:
 
-### Especificaciones del Software
-| Componente | Versión Recomendada | Función en el Proyecto |
-| :--- | :---: | :--- |
-| **Python** | 3.10+ | Lógica del servidor y scripts |
-| **FastAPI** | 0.109.0 | Gestión de rutas y endpoints |
-| **PyAutoGUI** | 0.9.54 | Automatización de la interfaz (RPA) |
-| **FlamMap** | 6.x | Motor de cálculo físico |
+- Gestionar endpoints  
+- Validar archivos subidos (.lcp / .tif)  
+- Crear entornos aislados  
+- Ejecutar simulaciones  
+- Devolver resultados al cliente  
 
+---
 
-## Uso de la API
-Una vez el servidor este activo, puede interactuar con el servicio a traves de la interfaz Swagger UI:
+### app/flammap_runner.py
 
-* URL de Documentacion: http://127.0.0.1:8000/docs
-* Endpoint Principal: POST /lanzar-simulacion
+Motor de ejecución.
 
-Al ejecutar la peticion, el robot tomara el control del raton y teclado para abrir el proyecto, ejecutar el calculo y visualizar los resultados de Flame Length.
+Responsabilidades:
 
+- Construir comandos del sistema  
+- Invocar `TestFlamMap.exe` en modo silencioso  
+- Ejecutar simulaciones en background  
+- Verificar archivos `.tif` generados  
 
-## Notas Importantes
-* Automatizacion GUI: El robot depende de las coordenadas de pantalla. No mueva el raton ni cambie de ventana mientras la simulacion este en curso.
-* Rutas de Archivos: Verifique que las rutas definidas en main.py coincidan con la ubicacion real de FlamMap y el archivo .fmp en su equipo.
+---
 
+### app/config_writer.py
 
-## Autoria
-* Desarrollador: Ciara Martín
-* Institucion: XRF Lab (Periodo de Practicas)
-* Version: 1.0 (Ronda 1)
+Generador de archivos de configuración.
 
+Responsabilidades:
+
+- Crear archivos `.input`  
+- Definir variables de humedad  
+- Definir viento  
+- Configurar generación de grids  
+
+---
+
+### data/temp_sessions/
+
+Directorio de trabajo temporal (**Sandbox**).
+
+Cada petición crea una carpeta única:
+
+```
+data/temp_sessions/a1b2c3d4/
+```
+
+Esto asegura que los datos de un usuario no interfieran con los de otro.
+
+---
+
+## ⚙️ Instalación y Requisitos
+
+### 1. Requisitos del Sistema
+
+Python **3.10 o superior**
+
+#### Ejecutables de Consola de FlamMap
+
+No sirve la versión estándar de escritorio.
+
+Se requiere la versión de línea de comandos.
+
+Fuente:
+
+Alturas Solutions / Fire Lab API
+
+Archivo necesario:
+
+```
+TestFlamMap.exe
+```
+
+Ubicación típica:
+
+```
+bin/TestFlamMap.exe
+```
+
+---
+
+### 2. Instalación de Librerías
+
+```
+pip install -r requirements
+```
+
+---
+
+### 3. Configuración de Rutas
+
+Edite el archivo:
+
+```
+app/flammap_runner.py
+```
+
+Configure la ruta al ejecutable:
+
+```python
+flammap_exe = r"C:\Workspace\FB\bin\TestFlamMap.exe"
+```
+
+---
+
+## ▶️ Ejecución del Servicio
+
+Para iniciar el servidor:
+
+```bash
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+El servicio estará disponible en:
+
+```
+http://127.0.0.1:8000
+```
+
+---
+
+## 📡 Uso de la API
+
+### Opción A — Swagger UI
+
+Acceder desde el navegador:
+
+```
+http://127.0.0.1:8000/docs
+```
+
+Permite probar los endpoints visualmente.
+
+---
+
+### Opción B — Terminal (cURL)
+
+Ejemplo de ejecución:
+
+```bash
+curl -X POST "http://127.0.0.1:8000/lanzar-simulacion" ^
+  -F "wind_speed=20" ^
+  -F "wind_direction=225" ^
+  -F "fuel_moisture=6" ^
+  -F "file=@C:\Ruta\A\Tu\Paisaje.tif" ^
+  --output mapa_fuego.tif
+```
+
+---
+
+## 📊 Salida de Datos
+
+El sistema genera múltiples capas raster.
+
+Por defecto la API devuelve:
+
+**Flame Length (Longitud de Llama)**
+
+El motor también calcula:
+
+- Rate of Spread (Velocidad de propagación)
+- Fireline Intensity (Intensidad)
+- Crown Fire Activity (Fuego de copas)
+- Wind Vectors (Vectores de viento)
+
+---
+
+## 📋 Especificaciones Técnicas
+
+| Componente | Versión | Función |
+|-----------|---------|---------|
+| Python | 3.10+ | Lenguaje base |
+| FastAPI | 0.109+ | Framework API |
+| Subprocess | StdLib | Ejecución de procesos |
+| TestFlamMap | 6.x CLI | Motor de cálculo |
+
+---
+
+## ⚠️ Notas Importantes
+
+### Formato de Archivos
+
+El motor es sensible a rutas con:
+
+- Espacios
+- Caracteres especiales
+
+El sistema lo gestiona automáticamente, pero se recomienda usar nombres simples.
+
+---
+
+### Visualización
+
+Los resultados son **GeoTIFF de 32 bits**.
+
+Se recomienda visualizar en:
+
+- QGIS
+- ArcGIS
+
+Aplicando:
+
+**Pseudocolor Monobanda**
+
+---
+
+## Autoría
+
+**Desarrollador:** Ciara Martín  
+**Institución:** XRF Lab (Periodo de Prácticas)  
+**Versión:** 2.0 (Headless Architecture)

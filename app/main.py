@@ -7,14 +7,14 @@ import shutil
 import uuid  # Necesario para crear nombres únicos de sesión
 
 # --- Módulos locales ---
-from flammap_runner import ejecutar_simulacion_robot
+from flammap_runner import preparar_y_ejecutar_flammap
 from config_writer import crear_archivos_input
 from fmp_manager import crear_proyecto_temporal 
 
 app = FastAPI(
-    title="XRF FlamMap Service (Pro)", 
+    title="XRF FlamMap Service", 
     version="2.0",
-    description="Servicio SaaS de Simulación de Incendios: Multi-usuario con sesiones aisladas"
+    description="Servicio SaaS de Simulación de Incendios: Multi-usuario con sesiones aisladas y ejecución en segundo plano"
 )
 
 # --- CONFIGURACIÓN GLOBAL ---
@@ -31,11 +31,11 @@ simulation_lock = threading.Lock()
 
 @app.get("/")
 def home():
-    return {"status": "Online", "mode": "Professional SaaS"}
+    return {"status": "Online", "mode": "Professional SaaS (Headless)"}
 
 @app.post("/lanzar-simulacion")
 async def trigger_simulation(
-    # --- INPUTS (Ahora recibimos Archivo + Datos de Formulario) ---
+    # --- INPUTS ---
     file: UploadFile = File(..., description="Archivo de paisaje (.LCP o .tif)"),
     wind_speed: float = Form(..., description="Velocidad viento (mph)"),
     wind_direction: int = Form(..., description="Dirección viento (grados)"),
@@ -43,14 +43,15 @@ async def trigger_simulation(
 ):
     """
     Endpoint Profesional:
-    1. Crea un ID único de sesión (para no mezclar usuarios).
-    2. Guarda el LCP/tif subido en una carpeta aislada.
-    3. Genera inputs y modifica el proyecto .FMP para apuntar a esa carpeta.
-    4. Ejecuta el robot de forma segura (Lock).
+    1. Crea un ID único de sesión.
+    2. Guarda el LCP/tif subido.
+    3. Genera inputs de configuración.
+    4. Ejecuta el motor de FlamMap en consola de forma segura (Lock).
+    5. Devuelve el mapa TIF resultante.
     """
 
-    # 1. PREPARACIÓN DE SESIÓN (Esto es nuevo: Aislamiento)
-    session_id = str(uuid.uuid4())[:8]  # Ej: 'a1b2c3d4'
+    # 1. PREPARACIÓN DE SESIÓN
+    session_id = str(uuid.uuid4())[:8] 
     session_dir = os.path.join(WORK_DIR, session_id)
     os.makedirs(session_dir, exist_ok=True)
     
@@ -58,34 +59,23 @@ async def trigger_simulation(
 
     # Rutas dinámicas para esta sesión específica
     lcp_path = os.path.join(session_dir, file.filename)
-    output_tif = os.path.join(session_dir, "resultado.tif")
 
     try:
         # A. Guardar el archivo LCP que subió el usuario
         with open(lcp_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # B. Generar Archivos de Entrada (Viento/Humedad) en la carpeta de sesión
-        # Reutilizamos tu config_writer, pero le pasamos la carpeta dinámica
+        # B. Generar Archivos de Entrada (Mantenemos tu lógica anterior por compatibilidad)
         wnd_path, fms_path = crear_archivos_input(
-            session_dir, 
-            wind_speed, 
-            wind_direction, 
-            fuel_moisture
+            session_dir, wind_speed, wind_direction, fuel_moisture
         )
 
-        # C. Crear Proyecto .FMP "Custom" (El paso clave del profesional)
-        # Usamos la plantilla y cambiamos sus rutas internas
+        # C. Crear Proyecto .FMP 
         project_session_path = crear_proyecto_temporal(
-            TEMPLATE_PATH, 
-            lcp_path, 
-            wnd_path, 
-            fms_path, 
-            session_dir
+            TEMPLATE_PATH, lcp_path, wnd_path, fms_path, session_dir
         )
 
-        # 2. SECCIÓN CRÍTICA (Bloqueo del Robot)
-        # Intentar adquirir bloqueo (sin esperar, falla rápido)
+        # 2. SECCIÓN CRÍTICA (Bloqueo del motor)
         if not simulation_lock.acquire(blocking=False):
             raise HTTPException(
                 status_code=503, 
@@ -93,35 +83,41 @@ async def trigger_simulation(
             )
 
         try:
-            print(f"[Sesión {session_id}] Ejecutando Robot...")
+            print(f"[Sesión {session_id}] Ejecutando motor en segundo plano...")
             
-            # Ejecutamos el robot apuntando al proyecto TEMPORAL de esta sesión
-            exito = ejecutar_simulacion_robot(
-                EXE_PATH, 
-                project_session_path, # <--- Usamos el modificado, no el original
-                output_tif
+            # Ejecutamos el motor de consola apuntando a la sesión actual
+            archivos_generados = preparar_y_ejecutar_flammap(
+                project_session_path,
+                lcp_path,
+                fuel_moisture,
+                wind_speed
             )
 
             # 3. RESPUESTA
-            if exito and os.path.exists(output_tif):
+            # Verificamos que el motor nos haya devuelto la lista con los TIFs
+            if archivos_generados and len(archivos_generados) > 0:
+                mapa_principal = archivos_generados[0] # Tomamos el FLAMELENGTH
+                
                 return FileResponse(
-                    path=output_tif, 
-                    filename=f"simulacion_{session_id}.tif", 
+                    path=mapa_principal, 
+                    filename=f"simulacion_{session_id}_FlameLength.tif", 
                     media_type='image/tiff'
                 )
             else:
-                raise HTTPException(status_code=500, detail="El simulador no generó el archivo.")
+                raise HTTPException(status_code=500, detail="El simulador falló internamente al crear los archivos TIF.")
 
         finally:
-            # Liberar siempre el robot
+            # Liberar siempre el hilo, pase lo que pase
             simulation_lock.release()
-            print(f"[Sesión {session_id}] Robot liberado.")
+            print(f"[Sesión {session_id}] Hilo de ejecución liberado.")
 
+    except HTTPException:
+        # Relanzamos las excepciones HTTP tal cual para que FastAPI las gestione
+        raise
+        
     except Exception as e:
         print(f"Error crítico en sesión {session_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-    # (Opcional: Podrías añadir código aquí para borrar session_dir tras enviar el archivo)
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {str(e)}")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

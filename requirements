@@ -1,0 +1,4 @@
+pip install fastapi, uvicorn, pywinauto, python-multipart
+
+- no visual, por terminal
+- descargar los datos generados para poder realizar un mapa con ellos
