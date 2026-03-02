@@ -13,7 +13,7 @@ El sistema interactúa directamente con los ejecutables de consola del Missoula 
 
 ---
 
-## 🚀 Características Principales
+## Características Principales
 
 ### Arquitectura Backend Real
 
@@ -42,7 +42,7 @@ Basada en los parámetros recibidos vía HTTP.
 
 ---
 
-## 📂 Estructura del Proyecto
+## Estructura del Proyecto
 
 ```
 FLAMMAPSERVICEXRF/
@@ -67,7 +67,7 @@ FLAMMAPSERVICEXRF/
 
 ---
 
-## 🛠️ Descripción de Componentes
+## Descripción de Componentes
 
 ### app/main.py
 
@@ -90,7 +90,7 @@ Motor de ejecución.
 Responsabilidades:
 
 - Construir comandos del sistema  
-- Invocar `TestFlamMap.exe` en modo silencioso  
+- Invocar `TestFlamMap.exe` en segundo plano  
 - Ejecutar simulaciones en background  
 - Verificar archivos `.tif` generados  
 
@@ -123,7 +123,7 @@ Esto asegura que los datos de un usuario no interfieran con los de otro.
 
 ---
 
-## ⚙️ Instalación y Requisitos
+## Instalación y Requisitos
 
 ### 1. Requisitos del Sistema
 
@@ -177,7 +177,7 @@ flammap_exe = r"C:\Workspace\FB\bin\TestFlamMap.exe"
 
 ---
 
-## ▶️ Ejecución del Servicio
+##  Ejecución del Servicio
 
 Para iniciar el servidor:
 
@@ -193,7 +193,7 @@ http://127.0.0.1:8000
 
 ---
 
-## 📡 Uso de la API
+##  Uso de la API
 
 ### Opción A — Swagger UI
 
@@ -222,7 +222,7 @@ curl -X POST "http://127.0.0.1:8000/lanzar-simulacion" ^
 
 ---
 
-## 📊 Salida de Datos
+##  Salida de Datos
 
 El sistema genera múltiples capas raster.
 
@@ -239,7 +239,7 @@ El motor también calcula:
 
 ---
 
-## 📋 Especificaciones Técnicas
+##  Especificaciones Técnicas
 
 | Componente | Versión | Función |
 |-----------|---------|---------|
@@ -250,7 +250,7 @@ El motor también calcula:
 
 ---
 
-## ⚠️ Notas Importantes
+##  Notas Importantes
 
 ### Formato de Archivos
 
